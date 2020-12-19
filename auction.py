@@ -31,12 +31,14 @@ def init_connection(client_id, client_secret):
 def download(args):
     client = init_connection(args.client_id, args.client_secret)
     db = init_db(args.store)
-    r = client.get(f'{url_base}/data/wow/connected-realm/{args.realm}/auctions?namespace=dynamic-us&locale=en_US')
-    auctions = r.json()['auctions']
+    response = client.get(f'{url_base}/data/wow/connected-realm/{args.realm}/auctions?namespace=dynamic-us&locale=en_US')
+    response.raise_for_status()
+    auctions = response.json()['auctions']
     items = {}
+    search_items = set(args.items)
     for auction in auctions:
         id = auction['item']['id']
-        if (id == 168583 or id == 170554):
+        if str(id) in search_items:
             price = auction['unit_price']
             quantity = auction['quantity']
             if type(price) is int and type(quantity) is int:
@@ -65,6 +67,7 @@ def main():
     add_client_arguments(parser_download)
     parser_download.add_argument('--realm', type=int, default='154', help='wow connected-realm id')
     parser_download.add_argument('--store', type=str, default='auction.db', help='auction sqlite database location')
+    parser_download.add_argument('--items', type=str, required=True, action='extend', nargs='+', help='item ids to filter on')
     parser_download.set_defaults(func=download)
     args = parser.parse_args()
     args.func(args)
