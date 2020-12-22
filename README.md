@@ -13,5 +13,11 @@ Fetch from the Auction House:
 - Nightshade (171315)
 
 ```shell
-$ ./auction.py download --client-id CLIENT_ID --client-secret CLIENT_SECRET --realm CONNECTED_REALM_ID --items 169701 168583 170554 168589 168586 171315
+./auction.py download --client-id CLIENT_ID --client-secret CLIENT_SECRET --realm CONNECTED_REALM_ID --items 169701 168583 170554 168589 168586 171315
+```
+
+# Install
+
+```shell
+pip install -r requirements.txt
 ```
