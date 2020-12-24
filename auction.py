@@ -1,11 +1,12 @@
 #!/usr/bin/python3
 import argparse
 import datetime
+import itertools
 import sqlite3
+
 from authlib.integrations.requests_client import OAuth2Session
 
-scope = 'wow.profile'
-url_base = 'https://us.api.blizzard.com'
+from battlenet import BNetClient
 
 # Dethecus: 81, Connected-Realm: 154
 
@@ -25,20 +26,40 @@ def init_db(db):
     return conn
 
 
-def init_connection(client_id, client_secret):
-    client = OAuth2Session(client_id, client_secret, scope=scope)
-    client.fetch_token('https://us.battle.net/oauth/token',
-                       grant_type='client_credentials')
-    return client
+def init_recipes(db):
+    conn = sqlite3.connect(db)
+    conn.execute('''
+    CREATE TABLE IF NOT EXISTS recipes
+    (
+        id INTEGER NOT NULL PRIMARY KEY,
+        profession INTEGER NOT NULL,
+        skilltier INTEGER NOT NULL,
+        name TEXT NOT NULL
+    )
+    ''')
+    conn.commit()
+    return conn
+
+# def init_items(db):
+#     conn = sqlite3.connect(db)
+#     conn.execute('''
+#     CREATE TABLE IF NOT EXISTS items
+#     (
+#         id INTEGER NOT NULL PRIMARY KEY,
+#         recipe INTEGER NOT NULL,
+#         skilltier INTEGER NOT NULL,
+#         name TEXT NOT NULL
+#     )
+#     ''')
+#     conn.commit()
+#     return conn
 
 
 def download(args):
-    client = init_connection(args.client_id, args.client_secret)
+    client = BNetClient(args.client_id, args.client_secret)
     db = init_db(args.store)
-    response = client.get(
-        f'{url_base}/data/wow/connected-realm/{args.realm}/auctions?namespace=dynamic-us&locale=en_US')
-    response.raise_for_status()
-    auctions = response.json()['auctions']
+    response = client.get_auction(args.realm)
+    auctions = response['auctions']
     items = {}
     search_items = set(args.items)
     for auction in auctions:
@@ -66,11 +87,35 @@ def download(args):
     db.close()
 
 
+def recipes(args, profession=171, skill_tier=2750, clean=False):
+    db = None
+    if not clean:
+        db = init_recipes(args.store)
+        cursor = db.execute('SELECT id FROM recipes WHERE profession = ? AND skilltier = ?', (profession, skill_tier))
+        recipe = cursor.fetchone()
+        if recipe is not None:
+            db.close()
+            return
+
+    client = BNetClient(args.client_id, args.client_secret)
+    response = client.get_recipes(profession, skill_tier)
+    categories = response['categories']
+    recipes = [category['recipes'] for category in categories]
+    recipes = list(itertools.chain(*recipes))
+    recipes = [(recipe['id'], profession, skill_tier, recipe['name'])
+               for recipe in recipes]
+    db.executemany('INSERT INTO recipes VALUES (?, ?, ?, ?)', recipes)
+    db.commit()
+    db.close()
+
+
 def add_client_arguments(subparser):
     subparser.add_argument('--client-id', required=True,
                            type=str, help='battle.net API client id')
     subparser.add_argument('--client-secret', required=True,
                            type=str, help='battle.net API client secret')
+    subparser.add_argument('--store', default='auction.db',
+                           type=str, help='sqlite database location')
 
 
 def main():
@@ -83,12 +128,15 @@ def main():
     parser_download.add_argument(
         '--realm', type=int, default='154', help='wow connected-realm id')
     parser_download.add_argument(
-        '--store', type=str, default='auction.db', 
-        help='auction sqlite database location')
-    parser_download.add_argument(
         '--items', type=str, required=True,
         action='extend', nargs='+', help='item ids to filter on')
     parser_download.set_defaults(func=download)
+
+    parser_recipes = subparsers.add_parser(
+        'recipes', help='show the latest recipes')
+    add_client_arguments(parser_recipes)
+    parser_recipes.set_defaults(func=recipes)
+
     args = parser.parse_args()
     args.func(args)
 
