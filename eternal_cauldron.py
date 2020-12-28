@@ -39,8 +39,8 @@ def shadestone(herbs):
     return 2 * (5 * herbs.D + 2 * (herbs.V + herbs.W + herbs.M + herbs.R))
 
 def main():
-    herbs = Herbs(N = 139, D = 39, R = 36, M = 110, W = 195, V = 115)
-    print(cauldron(herbs))
+    herbs = Herbs(N = 120, D = 25, R = 20, M = 65, W = 190, V = 49)
+    print(flask(herbs))
 
 if __name__ == "__main__":
     main()
