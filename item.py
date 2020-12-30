@@ -24,7 +24,7 @@ class Item:
             return self.price
 
         total_component_cost = self.__component_cost()
-        return total_component_cost if total_component_cost < self.price else self.price
+        return total_component_cost if self.price is None or total_component_cost < self.price else self.price
 
     def expand_quantity(self, items, quantity):
         return [(item, quantity * q) for (item, q) in items]
@@ -33,9 +33,9 @@ class Item:
         if not self.craftable:
             return [(self, 1)]
 
-        # Less than is used to favor the time savings when equal for 
+        # Less than is used to favor the time savings when equal for
         # the cost of components since recipes take time to create.
-        if self.__component_cost() < self.price:
+        if self.price is None or self.__component_cost() < self.price:
             craft_items_selection = [self.expand_quantity(
                 item.selection(), quantity) for (item, quantity) in self.craft_items]
             craft_items_selection = list(

@@ -1,12 +1,12 @@
 import sqlite3
-from enum import Enum
 
 
 class Store:
     def __init__(self, database):
         self.conn = None
         self.database = database
-        self.auctions = AuctionsTable(self)
+        self.__auctions = AuctionsTable(self)
+        self.__downloads = DownloadsTable(self)
         self.__recipes = RecipesTable(self)
         self.__reagents = ReagentsTable(self)
         self.__quantities = QuantitiesTable(self)
@@ -20,38 +20,75 @@ class Store:
         self.conn.close()
 
     def __initialize(self):
-        self.auctions.create_if_exists()
+        self.__auctions.create_if_exists()
+        self.__downloads.create_if_exists()
         self.__recipes.create_if_exists()
         self.__reagents.create_if_exists()
         self.__quantities.create_if_exists()
 
+    def insert_auctions(self, listings, datetime):
+        self.__auctions.insert(listings)
+        self.__downloads.insert(datetime)
+
+    def get_reagents_price(self, recipe_id):
+        cur = self.conn.execute(
+            'SELECT datetime FROM downloads ORDER BY datetime DESC LIMIT 1')
+        datetime = cur.fetchone()
+        if datetime is None:
+            print('download from auction house first before searching.')
+            return None
+        cur = self.conn.execute('''
+        SELECT q.item_id, r.name, r.craftable, q.quantity, a.price
+        FROM quantities q
+        INNER JOIN reagents r
+            ON q.item_id = r.item_id
+            AND recipe_id = ?
+        INNER JOIN (
+            SELECT * FROM auctions
+            WHERE datetime = ?
+        ) a ON q.item_id = a.item_id
+        ''', (recipe_id, datetime[0]))
+        return cur.fetchall()
+
+    def get_price(self, item_id):
+        cur = self.conn.execute(
+            'SELECT datetime FROM downloads ORDER BY datetime DESC LIMIT 1')
+        datetime = cur.fetchone()
+        if datetime is None:
+            print('download from auction house first before searching.')
+            return None
+        listing = self.conn.execute(
+            'SELECT price FROM auctions WHERE item_id = ? and datetime = ?', (item_id, datetime[0]))
+        return listing.fetchone()
+
     def add_recipes(self, recipes):
         self.__recipes.insert(recipes)
         for recipe in recipes:
-            self.__reagents.insert(recipe.reagents)
+            self.__reagents.upsert(recipe.item_id, recipe.name, 1)
+            self.__reagents.insert_list(recipe.reagents)
             self.__quantities.insert(recipe.id, recipe.reagents)
 
-    def get_reagents(self, recipe_name):
-        cur = self.conn.execute('SELECT recipe_id FROM recipes WHERE name = ?', recipe_name)
-        recipe_id = cur.fetchone()
-        if recipe_id is None:
-            return None
-        cur = self.conn.execute('''
-            SELECT q.item_id, i.name, q.quantity
-            FROM quantities q
-            INNER JOIN items i
-                ON q.item_id = i.item_id
-                AND recipe_id = ?
-            ''', recipe_id)
-        return cur.fetchall()
-            
+    def get_recipe(self, recipe_id):
+        recipe = None
+        if type(recipe_id) == str:
+            cur = self.conn.execute(
+                'SELECT * FROM recipes WHERE name = ?', (recipe_id,))
+            recipe = cur.fetchone()
+        elif type(recipe_id) == int:
+            cur = self.conn.execute(
+                'SELECT * FROM recipes WHERE recipe_id = ?', (recipe_id,))
+            recipe = cur.fetchone()
+
+        return recipe
+
     def list_recipes(self, profession, skilltier):
-        cur = self.conn.execute('SELECT * FROM recipes WHERE profession = ? AND skilltier = ?', (profession, skilltier))
+        cur = self.conn.execute(
+            'SELECT * FROM recipes WHERE profession = ? AND skilltier = ?', (profession, skilltier))
         return cur.fetchall()
 
-    def get_all_reagents(self):
+    def get_all_reagent_ids(self):
         cur = self.conn.execute('SELECT item_id FROM reagents')
-        return cur.fetchall()
+        return [i[0] for i in cur.fetchall()]
 
 
 class Table:
@@ -67,10 +104,10 @@ class AuctionsTable(Table):
         self.store.conn.execute('''
         CREATE TABLE IF NOT EXISTS auctions
         (
-            id INTEGER NOT NULL,
+            item_id INTEGER NOT NULL,
             price INTEGER NOT NULL,
             quantity INTEGER NOT NULL,
-            date TEXT NOT NULL
+            datetime TEXT NOT NULL
         )
         ''')
         self.store.conn.commit()
@@ -78,7 +115,24 @@ class AuctionsTable(Table):
     def insert(self, auctions):
         auctions_insert = [(a.id, a.price, a.quantity, a.datetime)
                            for a in auctions]
-        self.store.conn.executemany('INSERT INTO auctions VALUES (?, ?, ?, ?)', auctions_insert)
+        self.store.conn.executemany(
+            'INSERT INTO auctions VALUES (?, ?, ?, ?)', auctions_insert)
+        self.store.conn.commit()
+
+
+class DownloadsTable(Table):
+    def create_if_exists(self):
+        self.store.conn.execute('''
+        CREATE TABLE IF NOT EXISTS downloads
+        (
+            datetime TEXT NOT NULL
+        )
+        ''')
+        self.store.conn.commit()
+
+    def insert(self, datetime):
+        self.store.conn.execute(
+            'INSERT INTO downloads VALUES (?)', (datetime,))
         self.store.conn.commit()
 
 
@@ -90,6 +144,7 @@ class RecipesTable(Table):
             recipe_id INTEGER NOT NULL PRIMARY KEY,
             profession INTEGER NOT NULL,
             skilltier INTEGER NOT NULL,
+            item_id INTEGER NOT NULL,
             name TEXT NOT NULL,
             crafted_quantity INTEGER NOT NULL
         )
@@ -97,10 +152,10 @@ class RecipesTable(Table):
         self.store.conn.commit()
 
     def insert(self, recipes):
-        recipes_insert = [(r.id, r.profession, r.skilltier,
+        recipes_insert = [(r.id, r.profession, r.skilltier, r.item_id,
                            r.name, r.crafted_quantity) for r in recipes]
         self.store.conn.executemany(
-            'INSERT INTO recipes VALUES (?, ?, ?, ?, ?)', recipes_insert)
+            'INSERT INTO recipes VALUES (?, ?, ?, ?, ?, ?)', recipes_insert)
         self.store.conn.commit()
 
 
@@ -116,8 +171,17 @@ class ReagentsTable(Table):
         ''')
         self.store.conn.commit()
 
-    def insert(self, items):
-        items_insert = [(i.id, i.name, 1) for i in items]
+    def upsert(self, item_id, name, craftable):
+        self.store.conn.execute('''
+        INSERT INTO reagents
+        VALUES (?, ?, ?)
+        ON CONFLICT(item_id)
+        DO UPDATE SET name = ?, craftable = ?
+        ''', (item_id, name, craftable, name, craftable))
+        self.store.conn.commit()
+
+    def insert_list(self, items):
+        items_insert = [(i.id, i.name, 0) for i in items]
         self.store.conn.executemany(
             'INSERT OR IGNORE INTO reagents VALUES (?, ?, ?)', items_insert)
         self.store.conn.commit()
@@ -136,7 +200,8 @@ class QuantitiesTable(Table):
         self.store.conn.commit()
 
     def get(self, recipe_id):
-        cur = self.store.conn.execute('SELECT * FROM quantities WHERE recipe_id = ?', recipe_id)
+        cur = self.store.conn.execute(
+            'SELECT * FROM quantities WHERE recipe_id = ?', recipe_id)
         return cur.fetchall()
 
     def insert(self, recipe_id, items):
