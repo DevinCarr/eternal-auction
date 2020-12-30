@@ -1,6 +1,6 @@
 # Eternal Auction
 
-Simple cli to download WoW auction house and capture prices for certain items.
+Simple cli to find cheapest reagents for recipes via WoW Auction House prices.
 
 ## Example
 
