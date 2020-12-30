@@ -30,10 +30,14 @@ class Store:
         self.__auctions.insert(listings)
         self.__downloads.insert(datetime)
 
-    def get_reagents_price(self, recipe_id):
+    def get_last_download(self):
         cur = self.conn.execute(
             'SELECT datetime FROM downloads ORDER BY datetime DESC LIMIT 1')
         datetime = cur.fetchone()
+        return datetime[0] if datetime is not None else None
+
+    def get_reagents_price(self, recipe_id):
+        datetime = self.get_last_download()
         if datetime is None:
             print('download from auction house first before searching.')
             return None
@@ -47,18 +51,16 @@ class Store:
             SELECT * FROM auctions
             WHERE datetime = ?
         ) a ON q.item_id = a.item_id
-        ''', (recipe_id, datetime[0]))
+        ''', (recipe_id, datetime))
         return cur.fetchall()
 
     def get_price(self, item_id):
-        cur = self.conn.execute(
-            'SELECT datetime FROM downloads ORDER BY datetime DESC LIMIT 1')
-        datetime = cur.fetchone()
+        datetime = self.get_last_download()
         if datetime is None:
             print('download from auction house first before searching.')
             return None
         listing = self.conn.execute(
-            'SELECT price FROM auctions WHERE item_id = ? and datetime = ?', (item_id, datetime[0]))
+            'SELECT price FROM auctions WHERE item_id = ? and datetime = ?', (item_id, datetime))
         return listing.fetchone()
 
     def add_recipes(self, recipes):
@@ -81,10 +83,10 @@ class Store:
 
         return recipe
 
-    def list_recipes(self, profession, skilltier):
+    def recipe_count(self, profession, skill_tier):
         cur = self.conn.execute(
-            'SELECT * FROM recipes WHERE profession = ? AND skilltier = ?', (profession, skilltier))
-        return cur.fetchall()
+            'SELECT COUNT(*) FROM recipes WHERE profession = ? AND skilltier = ?', (profession, skill_tier))
+        return cur.fetchone()[0]
 
     def get_all_reagent_ids(self):
         cur = self.conn.execute('SELECT item_id FROM reagents')
