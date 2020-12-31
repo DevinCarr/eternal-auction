@@ -66,22 +66,21 @@ class Store:
     def add_recipes(self, recipes):
         self.__recipes.insert(recipes)
         for recipe in recipes:
-            self.__reagents.upsert(recipe.item_id, recipe.name, 1)
+            self.__reagents.upsert(recipe.item_id, recipe.item_name, 1)
             self.__reagents.insert_list(recipe.reagents)
             self.__quantities.insert(recipe.id, recipe.reagents)
 
     def get_recipe(self, id):
         recipe = None
-        if type(id) == str:
-            cur = self.conn.execute('''
-                SELECT r.*, i.name FROM (SELECT *
-                FROM recipes
-                WHERE name = ?) r
-                INNER JOIN reagents AS i
-                ON r.item_id = i.item_id
-            ''', (id,))
-            recipe = cur.fetchone()
-        elif type(id) == int:
+        cur = self.conn.execute('''
+            SELECT r.*, i.name FROM (SELECT *
+            FROM recipes
+            WHERE name = ?) r
+            INNER JOIN reagents AS i
+            ON r.item_id = i.item_id
+        ''', (id,))
+        recipe = cur.fetchone()
+        if recipe is None:
             cur = self.conn.execute('''
                 SELECT r.*, i.name FROM (SELECT *
                 FROM recipes
@@ -115,7 +114,7 @@ class AuctionsTable(Table):
         self.store.conn.execute('''
         CREATE TABLE IF NOT EXISTS auctions
         (
-            item_id INTEGER NOT NULL,
+            item_id TEXT NOT NULL,
             price INTEGER NOT NULL,
             quantity INTEGER NOT NULL,
             datetime TEXT NOT NULL
@@ -156,7 +155,7 @@ class RecipesTable(Table):
             profession INTEGER NOT NULL,
             skilltier INTEGER NOT NULL,
             name TEXT NOT NULL,
-            item_id INTEGER NOT NULL,
+            item_id TEXT NOT NULL,
             crafted_quantity INTEGER NOT NULL
         )
         ''')
@@ -175,7 +174,7 @@ class ReagentsTable(Table):
         self.store.conn.execute('''
         CREATE TABLE IF NOT EXISTS reagents
         (
-            item_id INTEGER NOT NULL PRIMARY KEY,
+            item_id TEXT NOT NULL PRIMARY KEY,
             name TEXT NOT NULL,
             craftable INTEGER NOT NULL
         )
@@ -203,7 +202,7 @@ class QuantitiesTable(Table):
         self.store.conn.execute('''
         CREATE TABLE IF NOT EXISTS quantities
         (
-            item_id INTEGER NOT NULL,
+            item_id TEXT NOT NULL,
             recipe_id INTEGER NOT NULL,
             quantity INTEGER NOT NULL
         )

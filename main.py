@@ -5,20 +5,13 @@ from datetime import datetime, timedelta
 
 from auction import Auction
 from battlenet import BNetClient
+from constants import professions, vendor_reagents, unique_recipe_format
 from item import Item
 from reagent import Reagent
 from recipe import Recipe
 from store import Store
-from vendor_reagents import vendor_reagents
 
 # Dethecus: 81, Connected-Realm: 154
-
-professions = [
-    # 164, # Blacksmithing
-    (165, 2758), # Leatherworking
-    (171, 2750), # Alchemy
-    (333, 2753) # Enchanting
-]
 
 
 def download_listings(db, client_id, client_secret, realm=154):
@@ -33,14 +26,17 @@ def download_listings(db, client_id, client_secret, realm=154):
     items = {}
     search_items = set(db.get_all_reagent_ids())
     for auction in auctions:
-        id = auction['item']['id']
-        if int(id) in vendor_reagents:
+        id = str(auction['item']['id'])
+        if 'context' in auction['item']:
+            id_context = auction['item']['context']
+            id = f'{id}-{id_context}'
+        if id in vendor_reagents:
             items[id] = {
                 'id': id,
                 'price': vendor_reagents[id],
                 'quantity': -1
             }
-        elif int(id) in search_items:
+        elif id in search_items:
             price = auction['unit_price'] if 'unit_price' in auction else auction['buyout']
             quantity = auction['quantity']
             if type(price) is int and type(quantity) is int:
@@ -65,21 +61,33 @@ def download_listings(db, client_id, client_secret, realm=154):
     db.insert_auctions(listings, fetch_time)
 
 
+def unique_recipe(recipe_id, recipe_name, item_id):
+    # Some recipes have multiple ranks with the same name and
+    # no other identifiers besides unique items produced and recipe ids.
+    # This is provides a hook to distinguish the different ranks in their name.
+    # It also helps provide uniqueness when searching for a recipe.
+    if recipe_id in unique_recipe_format:
+        recipe_format, id_context = unique_recipe_format[recipe_id]
+        name = recipe_format.format(recipe_name)
+        return (name, f'{item_id}-{id_context}' if id_context is not None else item_id, name)
+    return (recipe_name, item_id, None)
+
+
 def get_recipe(client, profession_id, skill_tier, recipe_id):
     recipe_response = client.get_recipe(recipe_id)
-    try:
-        if 'crafted_item' not in recipe_response:
-            return None
-        recipe = Recipe(recipe_id, profession_id, skill_tier, None, None, None)
-        recipe.item_id = recipe_response['crafted_item']['id']
-        recipe.name = recipe_response['name']
-        recipe.crafted_quantity = int(recipe_response['crafted_quantity']['value'])
-        recipe.reagents = [Reagent(r['reagent']['id'], r['reagent']
+    if 'crafted_item' not in recipe_response:
+        return None
+    recipe = Recipe(recipe_id, profession_id, skill_tier, None, None, None)
+    recipe_name, item_id, item_name = unique_recipe(
+        recipe_id, recipe_response['name'], recipe_response['crafted_item']['id'])
+    recipe.item_id = item_id
+    recipe.name = recipe_name
+    recipe.item_name = recipe_name
+    recipe.crafted_quantity = int(
+        recipe_response['crafted_quantity']['value'])
+    recipe.reagents = [Reagent(r['reagent']['id'], r['reagent']
                                 ['name'], 0, int(r['quantity']), 0) for r in recipe_response['reagents']]
-        return recipe
-    except:
-        print('Error parsing recipe: ', recipe_id)
-
+    return recipe
 
 
 def fetch_recipes(db, client_id, client_secret, profession_id, skill_tier):
@@ -128,13 +136,19 @@ def cost_recipe_args(args):
     with Store(args.store) as db:
         # Fetch recipes/reagents
         for (profession_id, skill_tier) in professions:
-            fetch_recipes(db, args.client_id, args.client_secret, profession_id, skill_tier)
+            fetch_recipes(db, args.client_id, args.client_secret,
+                          profession_id, skill_tier)
         # Download listings from auction house
         download_listings(db, args.client_id, args.client_secret, args.realm)
         # Cost the recipe
         recipe = cost_recipe(db, args.recipename[0])
+        if recipe is None:
+            return
         if not args.cost:
-            print(f'\n{recipe.name} @ {recipe.price}g:')
+            if recipe.price is not None:
+                print(f'\n{recipe.name} @ {recipe.price}g:')
+            else:
+                print(f'\n{recipe.name}:')
             walk_recipe(recipe)
             items = recipe.selection()
             print('\nCost Breakdown:')
