@@ -9,8 +9,16 @@ from item import Item
 from reagent import Reagent
 from recipe import Recipe
 from store import Store
+from vendor_reagents import vendor_reagents
 
 # Dethecus: 81, Connected-Realm: 154
+
+professions = [
+    # 164, # Blacksmithing
+    (165, 2758), # Leatherworking
+    (171, 2750), # Alchemy
+    (333, 2753) # Enchanting
+]
 
 
 def download_listings(db, client_id, client_secret, realm=154):
@@ -26,7 +34,13 @@ def download_listings(db, client_id, client_secret, realm=154):
     search_items = set(db.get_all_reagent_ids())
     for auction in auctions:
         id = auction['item']['id']
-        if int(id) in search_items:
+        if int(id) in vendor_reagents:
+            items[id] = {
+                'id': id,
+                'price': vendor_reagents[id],
+                'quantity': -1
+            }
+        elif int(id) in search_items:
             price = auction['unit_price'] if 'unit_price' in auction else auction['buyout']
             quantity = auction['quantity']
             if type(price) is int and type(quantity) is int:
@@ -51,29 +65,36 @@ def download_listings(db, client_id, client_secret, realm=154):
     db.insert_auctions(listings, fetch_time)
 
 
-def get_recipe(client, recipe):
-    recipe_response = client.get_recipe(recipe.id)
-    recipe.item_id = recipe_response['crafted_item']['id']
-    recipe.name = recipe_response['name']
-    recipe.crafted_quantity = int(recipe_response['crafted_quantity']['value'])
-    recipe.reagents = [Reagent(r['reagent']['id'], r['reagent']
-                               ['name'], 0, int(r['quantity'])) for r in recipe_response['reagents']]
+def get_recipe(client, profession_id, skill_tier, recipe_id):
+    recipe_response = client.get_recipe(recipe_id)
+    try:
+        if 'crafted_item' not in recipe_response:
+            return None
+        recipe = Recipe(recipe_id, profession_id, skill_tier, None, None, None)
+        recipe.item_id = recipe_response['crafted_item']['id']
+        recipe.name = recipe_response['name']
+        recipe.crafted_quantity = int(recipe_response['crafted_quantity']['value'])
+        recipe.reagents = [Reagent(r['reagent']['id'], r['reagent']
+                                ['name'], 0, int(r['quantity']), 0) for r in recipe_response['reagents']]
+        return recipe
+    except:
+        print('Error parsing recipe: ', recipe_id)
 
 
-def fetch_recipes(db, client_id, client_secret, profession=171, skill_tier=2750):
+
+def fetch_recipes(db, client_id, client_secret, profession_id, skill_tier):
     # Fetch recipes only if not already cached
-    recipe_count = db.recipe_count(profession, skill_tier)
+    recipe_count = db.recipe_count(profession_id, skill_tier)
     if recipe_count > 0:
         return
     client = BNetClient(client_id, client_secret)
-    response = client.get_recipes(profession, skill_tier)
+    response = client.get_recipes(profession_id, skill_tier)
     categories = response['categories']
     recipes = [category['recipes'] for category in categories]
     recipes = list(itertools.chain(*recipes))
-    recipes = [Recipe(recipe['id'], profession, skill_tier, None, None, None)
+    recipes = [get_recipe(client, profession_id, skill_tier, recipe['id'])
                for recipe in recipes]
-    for recipe in recipes:
-        get_recipe(client, recipe)
+    recipes = [r for r in recipes if r is not None]
     db.add_recipes(recipes)
 
 
@@ -89,9 +110,9 @@ def cost_recipe(db, recipe_id):
     reagents = [Reagent(*r) for r in reagents]
     reagents_basic = [(Item(r.id, r.name, price=r.price), r.quantity)
                       for r in reagents if r.craftable == 0]
-    reagents_craft = [(cost_recipe(db, r.name), r.quantity)
+    reagents_craft = [(cost_recipe(db, r.id), r.quantity)
                       for r in reagents if r.craftable == 1]
-    return Item(recipe.item_id, recipe.name, price=recipe_price, recipe=reagents_basic + reagents_craft)
+    return Item(recipe.item_id, recipe.item_name, price=recipe_price, recipe=reagents_basic + reagents_craft)
 
 
 def walk_recipe(item, depth=0):
@@ -106,13 +127,14 @@ def walk_recipe(item, depth=0):
 def cost_recipe_args(args):
     with Store(args.store) as db:
         # Fetch recipes/reagents
-        fetch_recipes(db, args.client_id, args.client_secret)
+        for (profession_id, skill_tier) in professions:
+            fetch_recipes(db, args.client_id, args.client_secret, profession_id, skill_tier)
         # Download listings from auction house
         download_listings(db, args.client_id, args.client_secret, args.realm)
         # Cost the recipe
         recipe = cost_recipe(db, args.recipename[0])
         if not args.cost:
-            print(f'\n{recipe.name}:')
+            print(f'\n{recipe.name} @ {recipe.price}g:')
             walk_recipe(recipe)
             items = recipe.selection()
             print('\nCost Breakdown:')
@@ -129,7 +151,7 @@ def add_client_arguments(subparser):
                            type=str, help='battle.net API client id')
     subparser.add_argument('--client-secret', required=True,
                            type=str, help='battle.net API client secret')
-    subparser.add_argument('--store', default='auctions.db',
+    subparser.add_argument('--store', default='eternal.db',
                            type=str, help='sqlite database location')
 
 

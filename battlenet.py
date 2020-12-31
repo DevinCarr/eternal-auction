@@ -14,14 +14,32 @@ class BNetClient:
         response.raise_for_status()
         return response.json()
 
-    def get_recipes(self, profession, skill_tier):
+    def get_item(self, item_id):
         response = self.client.get(
-            f'{self.url_base}/data/wow/profession/{profession}/skill-tier/{skill_tier}?namespace=static-us&locale=en_US')
+            f'{self.url_base}/data/wow/item/{item_id}?namespace=static-us&locale=en_US')
         response.raise_for_status()
         return response.json()
 
-    def get_recipe(self, recipe):
+    def get_professions(self):
         response = self.client.get(
-            f'{self.url_base}/data/wow/recipe/{recipe}?namespace=static-us&locale=en_US')
+            f'{self.url_base}/data/wow/profession/index?namespace=static-us&locale=en_US')
+        response.raise_for_status()
+        return response.json()
+
+    def get_profession(self, profession_id):
+        response = self.client.get(
+            f'{self.url_base}/data/wow/profession/{profession_id}?namespace=static-us&locale=en_US')
+        response.raise_for_status()
+        return response.json()
+
+    def get_recipes(self, profession_id, skill_tier):
+        response = self.client.get(
+            f'{self.url_base}/data/wow/profession/{profession_id}/skill-tier/{skill_tier}?namespace=static-us&locale=en_US')
+        response.raise_for_status()
+        return response.json()
+
+    def get_recipe(self, recipe_id):
+        response = self.client.get(
+            f'{self.url_base}/data/wow/recipe/{recipe_id}?namespace=static-us&locale=en_US')
         response.raise_for_status()
         return response.json()

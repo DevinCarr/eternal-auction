@@ -70,17 +70,26 @@ class Store:
             self.__reagents.insert_list(recipe.reagents)
             self.__quantities.insert(recipe.id, recipe.reagents)
 
-    def get_recipe(self, recipe_id):
+    def get_recipe(self, id):
         recipe = None
-        if type(recipe_id) == str:
-            cur = self.conn.execute(
-                'SELECT * FROM recipes WHERE name = ?', (recipe_id,))
+        if type(id) == str:
+            cur = self.conn.execute('''
+                SELECT r.*, i.name FROM (SELECT *
+                FROM recipes
+                WHERE name = ?) r
+                INNER JOIN reagents AS i
+                ON r.item_id = i.item_id
+            ''', (id,))
             recipe = cur.fetchone()
-        elif type(recipe_id) == int:
-            cur = self.conn.execute(
-                'SELECT * FROM recipes WHERE recipe_id = ?', (recipe_id,))
+        elif type(id) == int:
+            cur = self.conn.execute('''
+                SELECT r.*, i.name FROM (SELECT *
+                FROM recipes
+                WHERE item_id = ?) r
+                INNER JOIN reagents AS i
+                ON r.item_id = i.item_id
+            ''', (id,))
             recipe = cur.fetchone()
-
         return recipe
 
     def recipe_count(self, profession, skill_tier):
@@ -146,16 +155,16 @@ class RecipesTable(Table):
             recipe_id INTEGER NOT NULL PRIMARY KEY,
             profession INTEGER NOT NULL,
             skilltier INTEGER NOT NULL,
-            item_id INTEGER NOT NULL,
             name TEXT NOT NULL,
+            item_id INTEGER NOT NULL,
             crafted_quantity INTEGER NOT NULL
         )
         ''')
         self.store.conn.commit()
 
     def insert(self, recipes):
-        recipes_insert = [(r.id, r.profession, r.skilltier, r.item_id,
-                           r.name, r.crafted_quantity) for r in recipes]
+        recipes_insert = [(r.id, r.profession, r.skill_tier, r.name,
+                           r.item_id, r.crafted_quantity) for r in recipes]
         self.store.conn.executemany(
             'INSERT INTO recipes VALUES (?, ?, ?, ?, ?, ?)', recipes_insert)
         self.store.conn.commit()
@@ -178,8 +187,8 @@ class ReagentsTable(Table):
         INSERT INTO reagents
         VALUES (?, ?, ?)
         ON CONFLICT(item_id)
-        DO UPDATE SET name = ?, craftable = ?
-        ''', (item_id, name, craftable, name, craftable))
+        DO UPDATE SET craftable = ?
+        ''', (item_id, name, craftable, craftable))
         self.store.conn.commit()
 
     def insert_list(self, items):
