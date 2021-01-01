@@ -2,15 +2,23 @@
 professions = [
     (165, 2758),  # Leatherworking
     (171, 2750),  # Alchemy
-    (333, 2753)  # Enchanting
+    (185, 2752),  # Cooking
+    (333, 2753)   # Enchanting
 ]
 
 
 # Map of vendor reagents that can be bought
-# generally cheaper by vendors
+# generally cheaper by vendors.
+# NOTE: Anything that would be lower than 1g is rounded down 
+# since the amount is usually low enough.
 vendor_reagents = {
+    '172056': 0,    # Medley of Transplanar Spices
+    '172057': 0,    # Inconceivably Aged Vinegar
+    '172058': 0,    # Smuggled Azerothian Produce
+    '172059': 0,    # Rich Grazer Milk
+    '178786': 0,    # Lusterwheat Flour
     '178787': 125,  # Orboreal Shard
-    '180732': 0    # Rune Etched Vial
+    '180732': 0     # Rune Etched Vial
 }
 
 # Map of recipe ids and their associated recipe names augmented
