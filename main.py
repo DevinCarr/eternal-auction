@@ -109,8 +109,7 @@ def fetch_recipes(db, client_id, client_secret, profession_id, skill_tier):
 def cost_recipe(db, recipe_id):
     recipe = db.get_recipe(recipe_id)
     if recipe is None:
-        print(f'Recipe with recipe name: {recipe_id} not found.')
-        return
+        return None
     recipe = Recipe(*recipe)
     recipe_price = db.get_price(recipe.item_id)
     recipe_price = recipe_price[0] if recipe_price is not None else None
@@ -143,6 +142,14 @@ def cost_recipe_args(args):
         # Cost the recipe
         recipe = cost_recipe(db, args.recipename[0])
         if recipe is None:
+            item_price = db.get_price_by_name(args.recipename[0])
+            if item_price is None:
+                print(f'Recipe with recipe name: {args.recipename[0]} not found.')
+            else:
+                if not args.cost:
+                    print(f'\n{args.recipename[0]} @ {item_price[0]}g')
+                else:
+                    print(f'{item_price[0]} g')
             return
         if not args.cost:
             if recipe.price is not None:
@@ -165,6 +172,8 @@ def add_client_arguments(subparser):
                            type=str, help='battle.net API client id')
     subparser.add_argument('--client-secret', required=True,
                            type=str, help='battle.net API client secret')
+    subparser.add_argument('--realm', default='154', 
+                           type=int, help='wow connected-realm id')
     subparser.add_argument('--store', default='eternal.db',
                            type=str, help='sqlite database location')
 
@@ -173,19 +182,14 @@ def main():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
 
-    parser_recipes = subparsers.add_parser(
-        'recipe', help='show the latest recipes')
-
-    recipe_subparsers = parser_recipes.add_subparsers()
-    parser_recipes_cost = recipe_subparsers.add_parser(
+    parser_cost = subparsers.add_parser(
         'cost', help='find fair market value for recipe')
-    add_client_arguments(parser_recipes_cost)
-    parser_recipes_cost.add_argument(
-        '--realm', type=int, default='154', help='wow connected-realm id')
-    parser_recipes_cost.add_argument(
+
+    add_client_arguments(parser_cost)
+    parser_cost.add_argument(
         '--cost', action='store_true', help='display cost only')
-    parser_recipes_cost.add_argument('recipename', type=str, nargs=1)
-    parser_recipes_cost.set_defaults(func=cost_recipe_args)
+    parser_cost.add_argument('recipename', type=str, nargs=1)
+    parser_cost.set_defaults(func=cost_recipe_args)
 
     args = parser.parse_args()
     args.func(args)

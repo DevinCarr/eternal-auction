@@ -59,9 +59,23 @@ class Store:
         if datetime is None:
             print('download from auction house first before searching.')
             return None
-        listing = self.conn.execute(
-            'SELECT price FROM auctions WHERE item_id = ? and datetime = ?', (item_id, datetime))
-        return listing.fetchone()
+        cur = self.conn.execute('''
+            SELECT price
+            FROM auctions
+            WHERE item_id = ? and datetime = ?
+            ''', (item_id, datetime))
+        return cur.fetchone()
+
+    def get_price_by_name(self, item_name):
+        cur = self.conn.execute('''
+            SELECT item_id
+            FROM reagents
+            WHERE name = ?
+            ''', (item_name,))
+        item_id = cur.fetchone()
+        if item_id is None:
+            return None
+        return self.get_price(item_id[0])
 
     def add_recipes(self, recipes):
         self.__recipes.insert(recipes)
@@ -73,18 +87,18 @@ class Store:
     def get_recipe(self, id):
         recipe = None
         cur = self.conn.execute('''
-            SELECT r.*, i.name FROM (SELECT *
-            FROM recipes
-            WHERE name = ?) r
-            INNER JOIN reagents AS i
-            ON r.item_id = i.item_id
-        ''', (id,))
+                SELECT r.*, i.name FROM (SELECT *
+                FROM recipes
+                WHERE item_id = ?) r
+                INNER JOIN reagents AS i
+                ON r.item_id = i.item_id
+            ''', (id,))
         recipe = cur.fetchone()
         if recipe is None:
             cur = self.conn.execute('''
                 SELECT r.*, i.name FROM (SELECT *
                 FROM recipes
-                WHERE item_id = ?) r
+                WHERE name = ?) r
                 INNER JOIN reagents AS i
                 ON r.item_id = i.item_id
             ''', (id,))
