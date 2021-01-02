@@ -58,7 +58,7 @@ def download_listings(db, client_id, client_secret, realm=154):
     fetch_time = datetime.utcnow()
     listings = [Auction(item['id'], item['quantity'], item['price'],
                         fetch_time) for (k, item) in items.items()]
-    db.insert_auctions(listings, fetch_time)
+    db.add_auctions(listings, fetch_time)
 
 
 def unique_recipe(recipe_id, recipe_name, item_id):
@@ -69,8 +69,8 @@ def unique_recipe(recipe_id, recipe_name, item_id):
     if recipe_id in unique_recipe_format:
         recipe_format, id_context = unique_recipe_format[recipe_id]
         name = recipe_format.format(recipe_name)
-        return (name, f'{item_id}-{id_context}' if id_context is not None else item_id, name)
-    return (recipe_name, item_id, None)
+        return (name, f'{item_id}-{id_context}' if id_context is not None else item_id)
+    return (recipe_name, item_id)
 
 
 def get_recipe(client, profession_id, skill_tier, recipe_id):
@@ -78,7 +78,7 @@ def get_recipe(client, profession_id, skill_tier, recipe_id):
     if 'crafted_item' not in recipe_response:
         return None
     recipe = Recipe(recipe_id, profession_id, skill_tier, None, None, None)
-    recipe_name, item_id, item_name = unique_recipe(
+    recipe_name, item_id = unique_recipe(
         recipe_id, recipe_response['name'], recipe_response['crafted_item']['id'])
     recipe.item_id = item_id
     recipe.name = recipe_name
@@ -92,7 +92,7 @@ def get_recipe(client, profession_id, skill_tier, recipe_id):
 
 def fetch_recipes(db, client_id, client_secret, profession_id, skill_tier):
     # Fetch recipes only if not already cached
-    recipe_count = db.recipe_count(profession_id, skill_tier)
+    recipe_count = db.get_recipe_count(profession_id, skill_tier)
     if recipe_count > 0:
         return
     client = BNetClient(client_id, client_secret)

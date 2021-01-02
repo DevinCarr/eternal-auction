@@ -3,17 +3,16 @@ import sqlite3
 
 class Store:
     def __init__(self, database):
-        self.conn = None
         self.database = database
+        self.conn = sqlite3.connect(self.database)
         self.__auctions = AuctionsTable(self)
         self.__downloads = DownloadsTable(self)
         self.__recipes = RecipesTable(self)
         self.__reagents = ReagentsTable(self)
         self.__quantities = QuantitiesTable(self)
+        self.__initialize()
 
     def __enter__(self):
-        self.conn = sqlite3.connect(self.database)
-        self.__initialize()
         return self
 
     def __exit__(self, type, value, traceback):
@@ -26,7 +25,7 @@ class Store:
         self.__reagents.create_if_exists()
         self.__quantities.create_if_exists()
 
-    def insert_auctions(self, listings, datetime):
+    def add_auctions(self, listings, datetime):
         self.__auctions.insert(listings)
         self.__downloads.insert(datetime)
 
@@ -105,7 +104,7 @@ class Store:
             recipe = cur.fetchone()
         return recipe
 
-    def recipe_count(self, profession, skill_tier):
+    def get_recipe_count(self, profession, skill_tier):
         cur = self.conn.execute(
             'SELECT COUNT(*) FROM recipes WHERE profession = ? AND skilltier = ?', (profession, skill_tier))
         return cur.fetchone()[0]
