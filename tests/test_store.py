@@ -16,7 +16,7 @@ listings = [
     Auction('3', 3, 3, utc_now)
 ]
 
-recipe = Recipe('1', 1, 1, 'test recipe', '1', 1, 'item name')
+recipe = Recipe(1, 1, 1, 'test recipe', '1', 1, 'item name')
 recipe.reagents = [
     Reagent('2', 'reagent 1', 0, 2, 2),
     Reagent('3', 'reagent 2', 0, 3, 3)
@@ -50,7 +50,7 @@ class TestStore(unittest.TestCase):
         self.assertEqual(self.db.get_price_by_name('reagent 1')[0], 2)
 
     def test_get_recipe(self):
-        recipe = Recipe(*self.db.get_recipe('1'))
+        recipe = Recipe(*self.db.get_recipe(1))
         self.assertEqual(recipe.id, 1)
         self.assertEqual(recipe.name, 'test recipe')
         recipe = Recipe(*self.db.get_recipe('test recipe'))
