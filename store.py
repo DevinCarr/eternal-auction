@@ -79,6 +79,7 @@ class Store:
     def add_recipes(self, recipes):
         self.__recipes.insert(recipes)
         for recipe in recipes:
+            print(f'\n{recipe.item_id}, {recipe.item_name}')
             self.__reagents.upsert(recipe.item_id, recipe.item_name, 1)
             self.__reagents.insert_list(recipe.reagents)
             self.__quantities.insert(recipe.id, recipe.reagents)
