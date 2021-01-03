@@ -198,7 +198,7 @@ class ReagentsTable(Table):
         self.store.conn.execute('''
         INSERT INTO reagents
         VALUES (?, ?, ?)
-        ON CONFLICT(item_id)
+        ON CONFLICT (item_id)
         DO UPDATE SET craftable = ?
         ''', (item_id, name, craftable, craftable))
         self.store.conn.commit()
