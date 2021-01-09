@@ -63,3 +63,25 @@ class TestStore(unittest.TestCase):
         reagent_ids = self.db.get_all_reagent_ids()
         self.assertEqual(len(reagent_ids), 3)
         self.assertListEqual(reagent_ids, ['1', '2', '3'])
+
+    def test_get_credentials(self):
+        self.db.add_or_replace_credentials('client-id', 'client-secret', utc_now)
+        self.util_test_creds('client-id', 'client-secret', str(utc_now))
+
+    def test_add_or_replace_credentials(self):
+        self.db.add_or_replace_credentials('client-id', 'client-secret', utc_now)
+        self.util_test_creds('client-id', 'client-secret', str(utc_now))
+        self.db.add_or_replace_credentials('client-id-1', 'client-secret-1', utc_now)
+        self.util_test_creds('client-id-1', 'client-secret-1', str(utc_now))
+
+    def test_clear_credentials(self):
+        self.db.add_or_replace_credentials('client-id', 'client-secret', utc_now)
+        self.db.clear_credentials()
+        self.assertIsNone(self.db.get_credentials())
+
+    def util_test_creds(self, expected_client_id, expected_client_secret, expected_datetime):
+        (client_id, client_secret, datetime) = self.db.get_credentials()
+        self.assertEqual(client_id, expected_client_id)
+        self.assertEqual(client_secret, expected_client_secret)
+        self.assertEqual(datetime, expected_datetime)
+
