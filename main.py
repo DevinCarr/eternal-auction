@@ -149,7 +149,7 @@ def cost_recipe_args(args):
                 if not args.cost:
                     print(f'\n{args.recipename[0]} @ {item_price[0]}g')
                 else:
-                    print(f'{item_price[0]} g')
+                    print(f'{item_price[0]}')
             return
         if not args.cost:
             if recipe.price is not None:
@@ -164,7 +164,7 @@ def cost_recipe_args(args):
                 print(f'{item.price * quantity}\t{quantity}\t{item.name}')
             print('================' + '=' *
                   max([len(i.name) for (i, q) in items]))
-        print(f'{recipe.cost()} g')
+        print(f'{recipe.cost()}')
 
 
 def add_client_arguments(subparser):
