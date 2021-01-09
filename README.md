@@ -1,13 +1,15 @@
 # Eternal Auction
 
-Simple cli to find cheapest reagents for recipes via WoW Auction House prices.
+Simple cli to find cheapest reagents for recipes and items via WoW Auction House prices.
 
 ## Example
 
 Fetch the cheapest reagents to make Shadestone with Auction House prices: 
 
 ```shell
-./main.py recipe cost 'Shadestone' --client-id CLIENT_ID --client-secret CLIENT_SECRET --realm CONNECTED_REALM_ID
+$ ./eternal.py creds add --client-id CLIENT_ID --client-secret CLIENT_SECRET
+
+$ ./eternal.py cost 'Shadestone' --realm CONNECTED_REALM_ID
 
 Shadestone:
 ∟>(5 Ground Death Blossom @ 40g)
@@ -39,4 +41,19 @@ gold    amount  reagent
 
 ```shell
 pip install -r requirements.txt
+```
+
+## Help
+
+```shell
+$ ./eternal.py --help
+usage: eternal.py [-h] {creds,cost} ...
+
+positional arguments:
+  {creds,cost}
+    creds       battle.net credential management
+    cost        find fair market value for recipe
+
+optional arguments:
+  -h, --help    show this help message and exit
 ```
