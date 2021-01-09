@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 from auction import Auction
 from battlenet import BNetClient
-from constants import professions, vendor_reagents, unique_recipe_format
+from constants import professions, unique_recipe_format, vendor_reagents
 from item import Item
 from reagent import Reagent
 from recipe import Recipe
@@ -133,18 +133,25 @@ def walk_recipe(item, depth=0):
 
 def cost_recipe_args(args):
     with Store(args.store) as db:
+        # Get battle.net credentials
+        creds = db.get_credentials()
+        if creds is None:
+            print('No battle.net credentials cached. Please use \'$ eternal creds add\' command to cache them')
+            return
+        (client_id, client_secret, _) = creds
         # Fetch recipes/reagents
         for (profession_id, skill_tier) in professions:
-            fetch_recipes(db, args.client_id, args.client_secret,
+            fetch_recipes(db, client_id, client_secret,
                           profession_id, skill_tier)
         # Download listings from auction house
-        download_listings(db, args.client_id, args.client_secret, args.realm)
+        download_listings(db, client_id, client_secret, args.realm)
         # Cost the recipe
         recipe = cost_recipe(db, args.recipename[0])
         if recipe is None:
             item_price = db.get_price_by_name(args.recipename[0])
             if item_price is None:
-                print(f'Recipe with recipe name: {args.recipename[0]} not found.')
+                print(
+                    f'Recipe with recipe name: {args.recipename[0]} not found.')
             else:
                 if not args.cost:
                     print(f'\n{args.recipename[0]} @ {item_price[0]}g')
@@ -167,13 +174,17 @@ def cost_recipe_args(args):
         print(f'{recipe.cost()}')
 
 
+def add_credentials(args):
+    with Store(args.store) as db:
+        db.add_or_replace_credentials(args.client_id, args.client_secret, datetime.utcnow())
+
+
+def clear_credentials(args):
+    with Store(args.store) as db:
+        db.clear_credentials()
+
+
 def add_client_arguments(subparser):
-    subparser.add_argument('--client-id', required=True,
-                           type=str, help='battle.net API client id')
-    subparser.add_argument('--client-secret', required=True,
-                           type=str, help='battle.net API client secret')
-    subparser.add_argument('--realm', default='154', 
-                           type=int, help='wow connected-realm id')
     subparser.add_argument('--store', default='eternal.db',
                            type=str, help='sqlite database location')
 
@@ -182,10 +193,30 @@ def main():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
 
+    parser_creds = subparsers.add_parser(
+        'creds', help='battle.net credential management')
+    subparser_creds = parser_creds.add_subparsers()
+
+    parser_creds_add = subparser_creds.add_parser(
+        'add', help='add battle.net credentials')
+    add_client_arguments(parser_creds_add)
+    parser_creds_add.add_argument('--client-id', required=True,
+                                  type=str, help='battle.net API client id')
+    parser_creds_add.add_argument('--client-secret', required=True,
+                                  type=str, help='battle.net API client secret')
+    parser_creds_add.set_defaults(func=add_credentials)
+
+    parser_creds_clear = subparser_creds.add_parser(
+        'clear', help='clear cached battle.net credentials')
+    add_client_arguments(parser_creds_clear)
+    parser_creds_clear.set_defaults(func=clear_credentials)
+
     parser_cost = subparsers.add_parser(
         'cost', help='find fair market value for recipe')
 
     add_client_arguments(parser_cost)
+    parser_cost.add_argument('--realm', default='154',
+                             type=int, help='wow connected-realm id')
     parser_cost.add_argument(
         '--cost', action='store_true', help='display cost only')
     parser_cost.add_argument('recipename', type=str, nargs=1)

@@ -10,6 +10,7 @@ class Store:
         self.__recipes = RecipesTable(self)
         self.__reagents = ReagentsTable(self)
         self.__quantities = QuantitiesTable(self)
+        self.__credentials = CredentialsTable(self)
         self.__initialize()
 
     def __enter__(self):
@@ -24,6 +25,7 @@ class Store:
         self.__recipes.create_if_exists()
         self.__reagents.create_if_exists()
         self.__quantities.create_if_exists()
+        self.__credentials.create_if_exists()
 
     def add_auctions(self, listings, datetime):
         self.__auctions.insert(listings)
@@ -112,6 +114,18 @@ class Store:
     def get_all_reagent_ids(self):
         cur = self.conn.execute('SELECT item_id FROM reagents')
         return [i[0] for i in cur.fetchall()]
+
+    def get_credentials(self):
+        return self.__credentials.get()
+
+    def add_or_replace_credentials(self, client_id, client_secret, datetime):
+        creds = self.__credentials.get()
+        if creds is not None:
+            self.__credentials.clear()
+        self.__credentials.insert(client_id, client_secret, datetime)
+
+    def clear_credentials(self):
+        self.__credentials.clear()
 
 
 class Table:
@@ -231,4 +245,30 @@ class QuantitiesTable(Table):
         quantities_insert = [(i.id, recipe_id, i.quantity) for i in items]
         self.store.conn.executemany(
             'INSERT OR IGNORE INTO quantities VALUES (?, ?, ?)', quantities_insert)
+        self.store.conn.commit()
+
+
+class CredentialsTable(Table):
+    def create_if_exists(self):
+        self.store.conn.execute('''
+        CREATE TABLE IF NOT EXISTS credentials
+        (
+            client_id TEXT NOT NULL,
+            client_secret TEXT NOT NULL,
+            datetime TEXT NOT NULL
+        )
+        ''')
+        self.store.conn.commit()
+
+    def get(self):
+        cur = self.store.conn.execute('SELECT * FROM credentials')
+        return cur.fetchone()
+
+    def insert(self, client_id, client_secret, datetime):
+        self.store.conn.execute(
+            'INSERT INTO credentials VALUES (?, ?, ?)', (client_id, client_secret, datetime))
+        self.store.conn.commit()
+
+    def clear(self):
+        self.store.conn.execute('DELETE FROM credentials')
         self.store.conn.commit()

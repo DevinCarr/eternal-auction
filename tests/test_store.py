@@ -1,9 +1,7 @@
-from datetime import datetime
 import unittest
+from datetime import datetime
 
 from auction import Auction
-from constants import professions, vendor_reagents, unique_recipe_format
-from item import Item
 from reagent import Reagent
 from recipe import Recipe
 from store import Store
