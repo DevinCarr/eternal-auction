@@ -1,10 +1,20 @@
 from authlib.integrations.requests_client import OAuth2Session
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 
 
 class BNetClient:
     def __init__(self, client_id, client_secret, url_base='https://us.api.blizzard.com', scope='wow.profile'):
         self.url_base = url_base
         self.client = OAuth2Session(client_id, client_secret, scope=scope)
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            method_whitelist=["HEAD", "GET", "OPTIONS"]
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.client.mount('https://', adapter)
         self.client.fetch_token('https://us.battle.net/oauth/token',
                                 grant_type='client_credentials')
 
@@ -41,5 +51,6 @@ class BNetClient:
     def get_recipe(self, recipe_id):
         response = self.client.get(
             f'{self.url_base}/data/wow/recipe/{recipe_id}?namespace=static-us&locale=en_US')
-        response.raise_for_status()
+        print(response.status_code)
+        # response.raise_for_status()
         return response.json()
