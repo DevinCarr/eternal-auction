@@ -1,3 +1,5 @@
 *.db
+build/
+dist/
 dmp/
 __pycache__

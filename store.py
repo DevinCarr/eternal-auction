@@ -1,4 +1,5 @@
 import sqlite3
+from reagent import Reagent
 
 
 class Store:
@@ -11,6 +12,7 @@ class Store:
         self.__reagents = ReagentsTable(self)
         self.__quantities = QuantitiesTable(self)
         self.__credentials = CredentialsTable(self)
+        self.__cache = CacheTable(self)
         self.__initialize()
 
     def __enter__(self):
@@ -26,6 +28,7 @@ class Store:
         self.__reagents.create_if_exists()
         self.__quantities.create_if_exists()
         self.__credentials.create_if_exists()
+        self.__cache.create_if_exists()
 
     def add_auctions(self, listings, datetime):
         self.__auctions.insert(listings)
@@ -78,6 +81,22 @@ class Store:
             return None
         return self.get_price(item_id[0])
 
+    def get_price_history(self, item_name):
+        cur = self.conn.execute('''
+            SELECT item_id
+            FROM reagents
+            WHERE name = ?
+            ''', (item_name,))
+        item_id = cur.fetchone()
+        if item_id is None:
+            return None
+        cur = self.conn.execute('''
+            SELECT *
+            FROM auctions
+            WHERE item_id = ?
+            ''', (item_id[0],))
+        return cur.fetchall()
+
     def add_recipes(self, recipes):
         self.__recipes.insert(recipes)
         for recipe in recipes:
@@ -115,6 +134,10 @@ class Store:
         cur = self.conn.execute('SELECT item_id FROM reagents')
         return [i[0] for i in cur.fetchall()]
 
+    def get_all_reagents(self):
+        cur = self.conn.execute('SELECT * FROM reagents')
+        return cur.fetchall()
+
     def get_credentials(self):
         return self.__credentials.get()
 
@@ -126,6 +149,12 @@ class Store:
 
     def clear_credentials(self):
         self.__credentials.clear()
+
+    def get_cache(self):
+        return self.__cache.get()
+
+    def update_cache(self, realm_name):
+        self.__cache.update(realm_name)
 
 
 class Table:
@@ -271,4 +300,24 @@ class CredentialsTable(Table):
 
     def clear(self):
         self.store.conn.execute('DELETE FROM credentials')
+        self.store.conn.commit()
+
+
+class CacheTable(Table):
+    def create_if_exists(self):
+        self.store.conn.execute('''
+        CREATE TABLE IF NOT EXISTS cache
+        (
+            realm_name INTEGER NOT NULL
+        )
+        ''')
+        self.store.conn.commit()
+
+    def get(self):
+        cur = self.store.conn.execute('SELECT * FROM cache')
+        return cur.fetchone()
+
+    def update(self, realm_name):
+        self.store.conn.execute('DELETE FROM cache')
+        self.store.conn.execute('INSERT INTO cache VALUES (?)', (realm_name,))
         self.store.conn.commit()

@@ -11,8 +11,6 @@ from reagent import Reagent
 from recipe import Recipe
 from store import Store
 
-# Dethecus: 81, Connected-Realm: 154
-
 
 def download_listings(db, client_id, client_secret, realm=154):
     # Check to see when the latest download of the auction house before downloading again

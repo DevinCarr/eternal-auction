@@ -42,6 +42,24 @@ class BNetClient:
         response.raise_for_status()
         return response.json()
 
+    def get_realms(self):
+        response = self.client.get(
+            f'{self.url_base}/data/wow/realm/index?namespace=dynamic-us&locale=en_US')
+        response.raise_for_status()
+        return response.json()
+
+    def get_connected_realms(self):
+        realms = self.get_realms()
+        realms = [self.get_realm(r['slug']) for r in realms['realms']]
+        realms = [(r['name'], r['connected_realm']['href']) for r in realms if r['is_tournament'] == False]
+        return [(name, cr[cr.find('connected-realm/') + len('connected-realm/'): cr.find('?')]) for (name, cr) in realms]
+
+    def get_realm(self, realm_slug):
+        response = self.client.get(
+            f'{self.url_base}/data/wow/realm/{realm_slug}?namespace=dynamic-us&locale=en_US')
+        response.raise_for_status()
+        return response.json()
+
     def get_recipes(self, profession_id, skill_tier):
         response = self.client.get(
             f'{self.url_base}/data/wow/profession/{profession_id}/skill-tier/{skill_tier}?namespace=static-us&locale=en_US')
